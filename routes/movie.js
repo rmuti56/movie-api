@@ -2,14 +2,17 @@ var express = require('express')
 var router = express.Router();
 var members = require('../validation/usersModel');
 var jwt = require('jsonwebtoken');
+const stream = require('stream');
+
 const fs = require('fs');
 const readline = require('readline');
+const multer = require('multer');
 const {
   google
 } = require('googleapis');
 
 const TOKEN_PATH = 'token.json';
-const SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly'];
+const SCOPES = ['https://www.googleapis.com/auth/drive'];
 
 var drive;
 fs.readFile('./credentials.json', (err, content) => {
@@ -33,7 +36,7 @@ function authorize(credentials, callback) {
       version: 'v3',
       auth: oAuth2Client
     });
-    listFiles();
+    //listFiles();
   });
 }
 
@@ -80,42 +83,89 @@ function getAccessToken(oAuth2Client, callback) {
   });
 }
 
-function uploadMovie() {
+
+var storage = multer.memoryStorage()
+var upload = multer({
+  storage: storage
+})
+
+// function uploadImage(file) {
+//   var fileMetadata = {
+//     'name': Date.now + file.originalname
+//   };
+//   var media = {
+//     mimeType: 'image/*',
+//     body: fs.createReadStream('./Video.mp4')
+//   };
+//   return new Promise((resolve, reject) => {
+//     drive.files.create({
+//       resource: fileMetadata,
+//       media: media,
+//       fields: 'id'
+//     }, function (err, file) {
+//       if (err) {
+//         reject(err);
+//       } else {
+//         resolve(file);
+//       }
+//     });
+//   })
+// }
+
+function gUpload(stream, filename, mimeType) {
+
   var fileMetadata = {
-    'name': '9.jpg'
+    'name': filename
   };
   var media = {
-    mimeType: 'image/png',
-    body: fs.createReadStream('./9.png')
+    mimeType,
+    body: stream
   };
   return new Promise((resolve, reject) => {
     drive.files.create({
       resource: fileMetadata,
       media: media,
       fields: 'id'
-    }, function (err, file) {
+    }, (err, file) => {
       if (err) {
-        reject(err);
+        reject('error');
       } else {
         resolve(file);
       }
-    });
+    })
   })
 }
-router.post('/upload', (req, res) => {
-  uploadMovie().then((result) => {
-    res.send(JSON.stringify({
-      status: 200,
-      message: 'success',
-      data: result
-    }));
-  }).catch(e => {
-    console.log(e);
-    res.send(JSON.stringify({
-      status: 500,
-      message: 'error'
-    }))
-  })
+
+router.post('/upload', upload.array('uploads[]'), (req, res) => {
+  let fileObject = req.files[0];
+  if (fileObject) {
+    let bufferStream = new stream.PassThrough();
+    bufferStream.end(fileObject.buffer);
+    gUpload(bufferStream, Date.now().toString() + '_' + fileObject.originalname, fileObject.mimetype).then(function (result) {
+      res.send(JSON.stringify({
+        data: result.data
+      }))
+    }).catch(function (error) {
+      console.log('error');
+      res.status(500);
+      res.send({
+        status: 500,
+        error: error,
+      });
+    });
+  }
+  // uploadImage(file).then((result) => {
+  //   res.send(JSON.stringify({
+  //     status: 200,
+  //     message: 'success',
+  //     data: result.data
+  //   }));
+  // }).catch(e => {
+  //   res.send(JSON.stringify({
+  //     status: 500,
+  //     message: e
+  //   }))
+  // })
 });
 //ลงชื่อเข้าใช้
 router.post('/login', (req, res) => {
