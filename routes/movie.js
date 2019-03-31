@@ -113,7 +113,6 @@ var upload = multer({
 // }
 
 function gUpload(stream, filename, mimeType) {
-
   var fileMetadata = {
     'name': filename
   };
@@ -138,6 +137,8 @@ function gUpload(stream, filename, mimeType) {
 
 router.post('/upload', upload.array('uploads[]'), (req, res) => {
   let fileObject = req.files[0];
+  console.log(fileObject)
+  console.log('ใหม่', req.files);
   if (fileObject) {
     let bufferStream = new stream.PassThrough();
     bufferStream.end(fileObject.buffer);
@@ -154,18 +155,6 @@ router.post('/upload', upload.array('uploads[]'), (req, res) => {
       });
     });
   }
-  // uploadImage(file).then((result) => {
-  //   res.send(JSON.stringify({
-  //     status: 200,
-  //     message: 'success',
-  //     data: result.data
-  //   }));
-  // }).catch(e => {
-  //   res.send(JSON.stringify({
-  //     status: 500,
-  //     message: e
-  //   }))
-  // })
 });
 //ลงชื่อเข้าใช้
 router.post('/login', (req, res) => {
