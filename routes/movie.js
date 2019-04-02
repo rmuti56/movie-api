@@ -1,6 +1,7 @@
 var express = require('express')
 var router = express.Router();
 var members = require('../validation/usersModel');
+var movies = require('../validation/movie.Modal');
 var jwt = require('jsonwebtoken');
 const stream = require('stream');
 
@@ -89,32 +90,11 @@ var upload = multer({
   storage: storage
 })
 
-// function uploadImage(file) {
-//   var fileMetadata = {
-//     'name': Date.now + file.originalname
-//   };
-//   var media = {
-//     mimeType: 'image/*',
-//     body: fs.createReadStream('./Video.mp4')
-//   };
-//   return new Promise((resolve, reject) => {
-//     drive.files.create({
-//       resource: fileMetadata,
-//       media: media,
-//       fields: 'id'
-//     }, function (err, file) {
-//       if (err) {
-//         reject(err);
-//       } else {
-//         resolve(file);
-//       }
-//     });
-//   })
-// }
 
 function gUpload(stream, filename, mimeType) {
   var fileMetadata = {
-    'name': filename
+    'name': filename,
+    'parents': ['11Nv0jlg-vpzbfwA3pWT_1SJcW-k39Fo1']
   };
   var media = {
     mimeType,
@@ -137,8 +117,6 @@ function gUpload(stream, filename, mimeType) {
 
 router.post('/upload', upload.array('uploads[]'), (req, res) => {
   let fileObject = req.files[0];
-  console.log(fileObject)
-  console.log('ใหม่', req.files);
   if (fileObject) {
     let bufferStream = new stream.PassThrough();
     bufferStream.end(fileObject.buffer);
@@ -156,6 +134,69 @@ router.post('/upload', upload.array('uploads[]'), (req, res) => {
     });
   }
 });
+
+//อ่านข้อูลจาก google drive
+// router.get('/get', (req, res) => {
+//   drive.files.get({
+//       fileId: '121C5so2RAdn8SOyIZFoTZNLf0ecjs-Xo',
+//       alt: 'media'
+//     }, {
+//       responseType: 'stream'
+//     },
+//     function (err, result) {
+//       result.data
+//         .on('end', () => {
+//           console.log(result);
+//           res.json(result);
+//         })
+//         .on('error', err => {
+//           console.log('Error', err);
+//         })
+//     });
+// });
+
+//แสดงหนังโดยรวม
+router.get('/loadmovies', (req, res) => {
+  var id = req.query.id
+  if (id != null) {
+    movies.findById(id, (err, dbMovies) => {
+      err ? res.json(err) : res.json(dbMovies);
+    })
+  } else {
+    var q = movies.find({}).sort({
+      updated: -1
+    });
+    q.exec((err, dbMovies) => {
+      err ? res.json(err) : res.json(dbMovies)
+    })
+  }
+})
+
+//แสดงหนังตามหมวดหมู่
+router.get('/searchmovie', (req, res) => {
+  var group = req.query.item;
+  movies.find({
+    group
+  }).sort({
+    updated: -1
+  }).exec((err, dbMovies) => {
+    err ? res.json(err) : res.json(dbMovies);
+  })
+})
+
+//แสดงหนังตามประเภท
+router.get('/searchtypemovie', (req, res) => {
+  var type = req.query.item;
+  movies.find({
+    type
+  }).sort({
+    updated: -1
+  }).exec((err, dbMovies) => {
+    err ? res.json(err) : res.json(dbMovies);
+  })
+})
+
+
 //ลงชื่อเข้าใช้
 router.post('/login', (req, res) => {
   var email = req.body.email;
@@ -186,5 +227,45 @@ router.post('/login', (req, res) => {
     }
   })
 })
+
+//อัพโหลดหนัง
+router.post('/addmovie', (req, res) => {
+  console.log(req.body)
+  var nameMovie = req.body.nameMovie;
+  var linkPreview = req.body.linkPreview;
+  var soundTrack = req.body.soundTrack;
+  var resolution = req.body.resolution;
+  var group = req.body.group;
+  var type = req.body.type;
+  var summary = req.body.summary;
+  var idImageUpload = req.body.idImageUpload;
+  var idVideoUpload = req.body.idVideoUpload;
+  var rating = req.body.rating
+  var created = Date.now();
+  var updated = Date.now();
+  new movies({
+    nameMovie,
+    linkPreview,
+    soundTrack,
+    resolution,
+    group,
+    type,
+    rating,
+    summary,
+    idImageUpload,
+    idVideoUpload,
+    created,
+    updated
+  }).save((err, result) => {
+    if (err) {
+      console.log(err)
+      res.json(err)
+    } else {
+      console.log('สำเร็จ')
+      res.json('เพิ่มข้อมูลสำเร็จ')
+    }
+  })
+})
+
 
 module.exports = router;
