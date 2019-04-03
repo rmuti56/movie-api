@@ -90,7 +90,7 @@ var upload = multer({
   storage: storage
 })
 
-
+//อัพโหลดไฟล์
 function gUpload(stream, filename, mimeType) {
   var fileMetadata = {
     'name': filename,
@@ -115,49 +115,102 @@ function gUpload(stream, filename, mimeType) {
   })
 }
 
+//แก้ไขไฟล์
+function updateFile(stream, id, mimeType, filename) {
+  console.log(id)
+  var media = {
+    mimeType,
+    body: stream
+  }
+  var fileMetadata = {
+    'name': filename,
+  };
+
+  return new Promise((resolve, reject) => {
+    drive.files.update({
+      fileId: id,
+      media: media,
+      resource: fileMetadata,
+    }, (err, file) => {
+      if (err) {
+        reject(err)
+      } else {
+        resolve(file);
+      }
+    })
+  })
+}
+
+//ลบไฟล์
+function deleteFile(idImage, idVideo) {
+  return new Promise((resolve, reject) => {
+    drive.files.delete({
+      fileId: idImage
+    }, (err, result) => {
+      if (err) {
+        reject(err)
+      } else {
+        drive.files.delete({
+          fileId: idVideo
+        }, (err, result) => {
+          if (err) {
+            reject(err)
+          } else {
+            resolve(result)
+          }
+        })
+      }
+    })
+  })
+}
+
+//อัพโหลดภาพ
 router.post('/upload', upload.array('uploads[]'), (req, res) => {
+  let id = req.query.id;
   let fileObject = req.files[0];
-  if (fileObject) {
+  if (id && fileObject) {
+    console.log('เข้านี้')
     let bufferStream = new stream.PassThrough();
     bufferStream.end(fileObject.buffer);
-    gUpload(bufferStream, Date.now().toString() + '_' + fileObject.originalname, fileObject.mimetype).then(function (result) {
+    updateFile(bufferStream, id, fileObject.mimetype, Date.now().toString() + '_' + fileObject.originalname).then((result) => {
+      console.log(result.data)
+      console.log('result', result)
       res.send(JSON.stringify({
         data: result.data
       }))
-    }).catch(function (error) {
-      console.log('error');
+    }).catch(err => {
+      console.log(err);
       res.status(500);
       res.send({
         status: 500,
-        error: error,
+        error: err
+      })
+    })
+  } else {
+    if (fileObject) {
+      let bufferStream = new stream.PassThrough();
+      bufferStream.end(fileObject.buffer);
+      gUpload(bufferStream, Date.now().toString() + '_' + fileObject.originalname, fileObject.mimetype).then(function (result) {
+        res.send(JSON.stringify({
+          data: result.data
+        }))
+      }).catch(function (error) {
+        console.log('error');
+        res.status(500);
+        res.send({
+          status: 500,
+          error: error,
+        });
       });
-    });
+    }
   }
-});
 
-//อ่านข้อูลจาก google drive
-// router.get('/get', (req, res) => {
-//   drive.files.get({
-//       fileId: '121C5so2RAdn8SOyIZFoTZNLf0ecjs-Xo',
-//       alt: 'media'
-//     }, {
-//       responseType: 'stream'
-//     },
-//     function (err, result) {
-//       result.data
-//         .on('end', () => {
-//           console.log(result);
-//           res.json(result);
-//         })
-//         .on('error', err => {
-//           console.log('Error', err);
-//         })
-//     });
-// });
+});
 
 //แสดงหนังโดยรวม
 router.get('/loadmovies', (req, res) => {
   var id = req.query.id
+
   if (id != null) {
     movies.findById(id, (err, dbMovies) => {
       err ? res.json(err) : res.json(dbMovies);
@@ -230,7 +283,7 @@ router.post('/login', (req, res) => {
 
 //อัพโหลดหนัง
 router.post('/addmovie', (req, res) => {
-  console.log(req.body)
+  var id = req.query.id
   var nameMovie = req.body.nameMovie;
   var linkPreview = req.body.linkPreview;
   var soundTrack = req.body.soundTrack;
@@ -243,27 +296,97 @@ router.post('/addmovie', (req, res) => {
   var rating = req.body.rating
   var created = Date.now();
   var updated = Date.now();
-  new movies({
-    nameMovie,
-    linkPreview,
-    soundTrack,
-    resolution,
-    group,
-    type,
-    rating,
-    summary,
-    idImageUpload,
-    idVideoUpload,
-    created,
-    updated
-  }).save((err, result) => {
-    if (err) {
-      console.log(err)
-      res.json(err)
+  if (id != null) {
+    if (!idImageUpload && !idVideoUpload) {
+      movies.findByIdAndUpdate(id, {
+        $set: {
+          nameMovie,
+          linkPreview,
+          soundTrack,
+          resolution,
+          group,
+          type,
+          rating,
+          summary,
+          updated
+        }
+      }, (err, dbMovies) => {
+        err ? res.json(err) : res.json('แก้ไขสำเร็จ')
+      })
+    } else if (!idImageUpload) {
+      movies.findByIdAndUpdate(id, {
+        $set: {
+          nameMovie,
+          linkPreview,
+          soundTrack,
+          resolution,
+          group,
+          type,
+          rating,
+          summary,
+          updated,
+          idVideoUpload
+        }
+      }, (err, dbMovies) => {
+        err ? res.json(err) : res.json('แก้ไขสำเร็จ')
+      })
     } else {
-      console.log('สำเร็จ')
-      res.json('เพิ่มข้อมูลสำเร็จ')
+      movies.findByIdAndUpdate(id, {
+        $set: {
+          nameMovie,
+          linkPreview,
+          soundTrack,
+          resolution,
+          group,
+          type,
+          rating,
+          summary,
+          updated,
+          idImageUpload
+        }
+      }, (err, dbMovies) => {
+        err ? res.json(err) : res.json('แก้ไขสำเร็จ')
+      })
     }
+  } else {
+    new movies({
+      nameMovie,
+      linkPreview,
+      soundTrack,
+      resolution,
+      group,
+      type,
+      rating,
+      summary,
+      idImageUpload,
+      idVideoUpload,
+      created,
+      updated
+    }).save((err, result) => {
+      if (err) {
+        console.log(err)
+        res.json(err)
+      } else {
+        console.log('สำเร็จ')
+        res.json('เพิ่มข้อมูลสำเร็จ')
+      }
+    })
+  }
+})
+
+//ลบหนัง
+router.delete('/deletemovie', (req, res) => {
+  let id = req.query.id
+  let idImageUpload = req.query.idImage;
+  let idVideoUpload = req.query.idVideo;
+  console.log(id, idImageUpload, idVideoUpload);
+  deleteFile(idImageUpload, idVideoUpload).then((result) => {
+    console.log(result)
+    movies.findByIdAndRemove(id, (err, result) => {
+      err ? res.json(err) : res.json(result);
+    })
+  }).catch(err => {
+    res.json(err)
   })
 })
 
